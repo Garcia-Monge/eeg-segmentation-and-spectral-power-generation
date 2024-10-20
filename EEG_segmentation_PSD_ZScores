@@ -1,0 +1,85 @@
+%Código para Matlab
+%Cálculo de PSD en bandas de frecuencia del archivo subido a EEGLab 
+%Calcula los Z-score y envía todo a una tabla excel
+%segmentar señal en segmentos de 3 segundos y calcular los poderes
+%espectrales de los 32 canales a 128Hz en las diferentes bandas de
+%frecuencia 
+%Se carga el archivo en eeglab y se aplica este código que generará una
+%matriz con los poderes espectrales:
+[ALLEEG, EEG, CURRENTSET] = eeg_store( ALLEEG, EEG, 0 );
+
+% Parámetros de la señal
+fs = 128; % Frecuencia de muestreo
+window_length = 3 * fs; % Longitud de la ventana en muestras (3 segundos)
+
+% Nombres de canales
+channel_names = {'Cz', 'Fz', 'Fp1', 'F7', 'F3', 'FC1', 'C3', 'FC5', 'FT9', 'T7', 'TP9', 'CP5', 'CP1', 'P3', 'P7', 'O1', 'Pz', 'Oz', 'O2', 'P8', 'P4', 'CP2', 'CP6', 'TP10', 'T8', 'FT10', 'FC6', 'C4', 'FC2', 'F4', 'F8', 'Fp2'};
+band_names = {'Delta', 'Theta', 'Alpha', 'LowBeta', 'HighBeta'};
+
+% Definir bandas de frecuencia
+bands = [0 3; 3 7; 7 13; 13 20; 20 30];
+
+% Preparar la matriz para almacenar las potencias espectrales
+num_windows = floor(length(EEG.data) / window_length);
+spectral_powers = zeros(num_windows, 32 * 5); 
+normalized_spectral_powers = zeros(num_windows, 32 * 5);
+
+% Crear encabezados de columna para PSD y Z-score
+column_headers = cell(1, 32 * 10); % 5 bandas para PSD y 5 para Z-score
+for channel = 1:32
+    for band = 1:5
+        column_headers{(channel-1)*10 + band} = [channel_names{channel} '_' band_names{band} '_PSD'];
+        column_headers{(channel-1)*10 + band + 5} = [channel_names{channel} '_' band_names{band} '_Zscore'];
+    end
+end
+
+% Procesar cada ventana
+for i = 1:num_windows
+    data_window = EEG.data(:, (i-1)*window_length + 1 : i*window_length);
+    for channel = 1:32
+        channel_data = data_window(channel, :);
+        [psd, freq] = pwelch(channel_data, hamming(window_length), [], [], fs);
+
+        % Calcula y almacena las potencias
+        for band = 1:5
+            spectral_powers(i, (channel-1)*5 + band) = bandpower(psd, freq, bands(band, :), 'psd');
+        end
+    end
+end
+
+% Definir el período de referencia (por ejemplo, los primeros 30 segundos)
+baseline_length = 30 * fs; % 30 segundos
+baseline_data = EEG.data(:, 1:baseline_length);
+baseline_powers = zeros(1, 32 * 5);
+
+% Calcular los PSD para el período de referencia
+for channel = 1:32
+    channel_data = baseline_data(channel, :);
+    [psd, freq] = pwelch(channel_data, hamming(baseline_length), [], [], fs);
+
+    % Calcula y almacena las potencias para el período de referencia
+    for band = 1:5
+        baseline_powers((channel-1)*5 + band) = bandpower(psd, freq, bands(band, :), 'psd');
+    end
+end
+
+% Calcular media y desviación estándar para el período de referencia
+baseline_mean = mean(baseline_powers);
+baseline_std = std(baseline_powers);
+
+% Normalizar los PSD utilizando Z-Score
+for i = 1:num_windows
+    normalized_spectral_powers(i, :) = (spectral_powers(i, :) - baseline_mean) ./ baseline_std;
+end
+
+% Combinar los PSD originales y los normalizados en una sola matriz
+combined_powers = [num2cell(spectral_powers) num2cell(normalized_spectral_powers)];
+
+% Añadir los encabezados a las matrices
+combined_powers_with_headers = [column_headers; combined_powers];
+
+% Definir la ruta y el nombre del archivo
+filename = 'C:\Users\Alfonso_admin\Documents\MATLAB\PSD\PSD_z-score.xlsx';
+
+% Exportar a Excel
+writecell(combined_powers_with_headers, filename);
