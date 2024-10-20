@@ -79,7 +79,7 @@ combined_powers = [num2cell(spectral_powers) num2cell(normalized_spectral_powers
 combined_powers_with_headers = [column_headers; combined_powers];
 
 % Definir la ruta y el nombre del archivo
-filename = 'C:\Users\Alfonso_admin\Documents\MATLAB\PSD\PSD_z-score.xlsx';
+filename = 'C:\Users\@@nombre de la cuenta@@\Documents\MATLAB\PSD\PSD_z-score.xlsx';
 
 % Exportar a Excel
 writecell(combined_powers_with_headers, filename);
